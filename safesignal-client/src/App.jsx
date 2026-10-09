@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { STATUS } from "./data";
+import { STATUS } from "./Data";
 import Planner from "./components/Planner";
 import Journey from "./components/Journey";
 import Simulator from "./components/Simulator";
 import Privacy from "./components/Privacy";
+import { checkIn } from "./Api";
 
 const tabs = [["journey", "Journey"], ["sim", "Simulator"], ["privacy", "Privacy"]];
 const now = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -15,10 +16,23 @@ export default function App() {
   const [log, setLog] = useState([]);
 
   const create = (f) => { setJ(f); setSt("planned"); setLog([["Journey started", now()]]); };
-  const setStatus = (k) => {
-    setSt(k);
-    setLog([[`Status: ${STATUS[k].t}${k === "assist" ? " (simulated alert)" : ""}`, now()], ...log]);
-  };
+  // Maps your UI status keys to the backend's status names.
+// Keys not listed here only change locally.
+const BACKEND_STATUS = { safe: "Safe", delayed: "Delayed", late: "Delayed", assist: "Need Assistance" };
+
+const setStatus = async (k) => {
+  setSt(k);
+  setLog((l) => [[`Status: ${STATUS[k].t}${k === "assist" ? " (simulated alert)" : ""}`, now()], ...l]);
+
+  const BACKEND_STATUS = { safe: "Safe", delayed: "Delayed", assist: "Need Assistance" };
+  if (backendStatus && j?.journey?.token) {
+    try {
+      await checkIn(j.journey.token, backendStatus);
+    } catch {
+      setLog((l) => [["Could not sync with server", now()], ...l]);
+    }
+  }
+};
 
   return (
     <div className="min-h-screen">

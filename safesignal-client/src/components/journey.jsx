@@ -1,10 +1,42 @@
-import { useState } from "react";
-import { card, STATUS, checklistFor } from "../data";
-import { Badge } from "./ui";
+import { useState, useEffect } from "react";
+import { card, STATUS, checklistFor } from "../Data";
+import { Badge } from "./Ui";
+import { getChecklist } from "../Api";
+
+// "21:30" -> a coarse label. We send only this, never the exact time or address.
+function timeOfDayLabel(time) {
+  const h = time ? parseInt(time.split(":")[0], 10) : 12;
+  if (h >= 22 || h < 5) return "late night";
+  if (h >= 19) return "late evening";
+  if (h >= 17) return "evening";
+  if (h >= 12) return "afternoon";
+  return "morning";
+}
 
 export default function Journey({ j, status, setStatus, log }) {
   const [done, setDone] = useState({});
-  const items = checklistFor(j.dest, j.time);
+  const [items, setItems] = useState(() => checklistFor(j.dest, j.time));
+  const [source, setSource] = useState("loading"); // loading | ai | default
+
+  useEffect(() => {
+    let cancelled = false;
+    getChecklist("general journey", timeOfDayLabel(j.time))
+      .then((data) => {
+        if (cancelled) return;
+        if (data.fallback || !data.items?.length) {
+          setSource("default");
+          return;
+        }
+        setItems(data.items.map((i) => i.text));
+        setDone({});
+        setSource("ai");
+      })
+      .catch(() => {
+        if (!cancelled) setSource("default");
+      });
+    return () => { cancelled = true; };
+  }, [j.time]);
+
   const btn = (k, text, cls) => (
     <button onClick={() => setStatus(k)}
       className={`flex-1 rounded-xl py-3 text-sm font-semibold transition border ${status === k ? cls + " ring-2 ring-offset-2 ring-offset-white dark:ring-offset-slate-900" : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
@@ -42,7 +74,12 @@ export default function Journey({ j, status, setStatus, log }) {
       )}
 
       <div className={card}>
-        <div className="flex items-center justify-between mb-3"><h3 className="font-semibold">Safety checklist</h3><Badge>Sample AI output</Badge></div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold">Safety checklist</h3>
+          <Badge>
+            {source === "ai" ? "AI-generated" : source === "loading" ? "Loading AI tips..." : "Sample checklist"}
+          </Badge>
+        </div>
         <ul className="space-y-2">
           {items.map((t, i) => (
             <li key={i}>

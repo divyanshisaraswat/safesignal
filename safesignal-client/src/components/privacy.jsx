@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { card } from "../data";
-import { Toggle } from "./ui";
+import { card } from "../Data";
+import { Toggle } from "./Ui";
 
 export default function Privacy() {
   const [p, setP] = useState({ loc: false, ai: true, hist: false });
