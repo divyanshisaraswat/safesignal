@@ -4,7 +4,7 @@ import cors from "cors";
 import mongoose from "mongoose";
 import rateLimit from "express-rate-limit";
 import assistantRouter from "./routes/assistant.js";
-import simulatorRouter from "./routes/simulator.js";
+import simulatorRouter from "./routes/Simulator.js";
 import journeysRouter from "./routes/journeys.js";
 
 const app = express();
