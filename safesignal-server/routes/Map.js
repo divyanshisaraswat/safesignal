@@ -1,6 +1,7 @@
 import express from "express";
 
 const router = express.Router();
+const supportedProfiles = new Set(["driving-car", "cycling-regular", "foot-walking"]);
 
 function parseCoordinatePair(value) {
   if (typeof value !== "string") return null;
@@ -14,8 +15,12 @@ function parseCoordinatePair(value) {
 router.get("/route", async (req, res) => {
   const start = parseCoordinatePair(req.query.start);
   const end = parseCoordinatePair(req.query.end);
+  const profile = req.query.profile || "driving-car";
   if (!start || !end) {
     return res.status(400).json({ error: "start and end must be longitude,latitude coordinate pairs" });
+  }
+  if (typeof profile !== "string" || !supportedProfiles.has(profile)) {
+    return res.status(400).json({ error: "profile must be driving-car, cycling-regular, or foot-walking" });
   }
 
   const apiKey = process.env.ORS_API_KEY;
@@ -25,7 +30,7 @@ router.get("/route", async (req, res) => {
 
   try {
     const response = await fetch(
-      `https://api.openrouteservice.org/v2/directions/driving-car?start=${start.join(",")}&end=${end.join(",")}`,
+      `https://api.openrouteservice.org/v2/directions/${profile}?start=${start.join(",")}&end=${end.join(",")}`,
       { headers: { Authorization: apiKey, Accept: "application/geo+json" }, signal: AbortSignal.timeout(15000) }
     );
     const data = await response.json();
