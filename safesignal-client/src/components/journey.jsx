@@ -1,103 +1,142 @@
-import { useState, useEffect } from "react";
-import { card, STATUS, checklistFor } from "../Data";
-import { Badge } from "./Ui";
-import { getChecklist } from "../Api";
+import { Check, ChevronDown, ChevronRight, Clock3, ShieldCheck } from "lucide-react";
+import { STATUS } from "../data";
 
-// "21:30" -> a coarse label. We send only this, never the exact time or address.
-function timeOfDayLabel(time) {
-  const h = time ? parseInt(time.split(":")[0], 10) : 12;
-  if (h >= 22 || h < 5) return "late night";
-  if (h >= 19) return "late evening";
-  if (h >= 17) return "evening";
-  if (h >= 12) return "afternoon";
-  return "morning";
+const statusOptions = [
+  ["safe", "Safe"],
+  ["delayed", "Delayed"],
+  ["assist", "Need help"],
+];
+
+function formatTime(value) {
+  if (!value) return "Not set";
+  const [hours, minutes] = value.split(":").map(Number);
+  const date = new Date();
+  date.setHours(hours, minutes, 0, 0);
+  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
-export default function Journey({ j, status, setStatus, log }) {
-  const [done, setDone] = useState({});
-  const [items, setItems] = useState(() => checklistFor(j.dest, j.time));
-  const [source, setSource] = useState("loading"); // loading | ai | default
+function timeUntil(value) {
+  if (!value) return "Arrival time not set";
+  const [hours, minutes] = value.split(":").map(Number);
+  const now = new Date();
+  const arrival = new Date();
+  arrival.setHours(hours, minutes, 0, 0);
+  if (arrival < now) arrival.setDate(arrival.getDate() + 1);
+  const totalMinutes = Math.max(1, Math.round((arrival - now) / 60000));
+  const remainingHours = Math.floor(totalMinutes / 60);
+  const remainingMinutes = totalMinutes % 60;
+  return remainingHours
+    ? `In ${remainingHours} hr ${remainingMinutes} min`
+    : `In ${remainingMinutes} min`;
+}
 
-  useEffect(() => {
-    let cancelled = false;
-    getChecklist("general journey", timeOfDayLabel(j.time))
-      .then((data) => {
-        if (cancelled) return;
-        if (data.fallback || !data.items?.length) {
-          setSource("default");
-          return;
-        }
-        setItems(data.items.map((i) => i.text));
-        setDone({});
-        setSource("ai");
-      })
-      .catch(() => {
-        if (!cancelled) setSource("default");
-      });
-    return () => { cancelled = true; };
-  }, [j.time]);
+export default function Journey({ journey, status, activity, onStatusChange }) {
+  const currentStatus = STATUS[status] || STATUS.safe;
+  const startTime = journey.startedAt
+    ? new Date(journey.startedAt).toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+    })
+    : "Now";
 
-  const btn = (k, text, cls) => (
-    <button onClick={() => setStatus(k)}
-      className={`flex-1 rounded-xl py-3 text-sm font-semibold transition border ${status === k ? cls + " ring-2 ring-offset-2 ring-offset-white dark:ring-offset-slate-900" : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
-      {text}
-    </button>
-  );
   return (
-    <div className="space-y-5">
-      <div className={card}>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-slate-500">Active journey</p>
-            <h2 className="text-xl font-semibold mt-1">{j.dest}</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Arrive by {j.time} · Contact: {j.cname}</p>
-          </div>
-          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUS[status].c}`}>{STATUS[status].t}</span>
-        </div>
-        <p className="text-sm font-medium mt-5 mb-2">Check in</p>
-        <div className="flex gap-2">
-          {btn("safe", "Safe", "bg-emerald-600 text-white border-emerald-600 ring-emerald-500")}
-          {btn("delayed", "Delayed", "bg-amber-500 text-white border-amber-500 ring-amber-400")}
-          {btn("assist", "Need help", "bg-rose-600 text-white border-rose-600 ring-rose-500")}
+    <div className="journey-card flex h-full flex-col rounded-xl p-4 text-white shadow-md sm:p-5">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="flex items-center gap-2 text-[11px] font-medium text-blue-100">
+          <span className="size-2 rounded-full bg-emerald-400" />
+          Live journey
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-semibold">
+          <ShieldCheck size={13} aria-hidden="true" />
+          Private
+        </span>
+      </div>
+
+      <div className="border-b border-white/10 pb-3">
+        <h2 className="text-xl font-bold leading-6">On your way</h2>
+        <p className="mt-1 text-[11px] leading-4 text-blue-100/80">
+          Your trusted contact can be updated at each check-in.
+        </p>
+      </div>
+
+      <ol className="my-3 space-y-3">
+        <li className="flex items-center gap-3">
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-emerald-400 text-[#073d5a]">
+            <Check size={17} strokeWidth={3} aria-hidden="true" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs font-semibold">Journey started</span>
+            <span className="block text-[10px] text-blue-100/70">Today, {startTime}</span>
+          </span>
+          <ChevronRight size={16} className="text-blue-100/70" aria-hidden="true" />
+        </li>
+        <li className="flex items-center gap-3">
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-blue-500 ring-4 ring-blue-400/20">
+            <span className="size-2 rounded-full bg-white" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs font-semibold">
+              {status === "delayed" ? "Delayed" : status === "assist" ? "Assistance requested" : "En route"}
+            </span>
+            <span className="block truncate text-[10px] text-blue-100/70">{activity || "Currently travelling"}</span>
+          </span>
+          <details className="relative">
+            <summary
+              aria-label="Update journey status"
+              className="flex size-7 cursor-pointer list-none items-center justify-center rounded-full text-blue-100/70 hover:bg-white/10"
+            >
+              <ChevronDown size={16} aria-hidden="true" />
+            </summary>
+            <div className="absolute right-0 top-8 z-10 min-w-36 rounded-lg border border-slate-200 bg-white p-1.5 text-slate-800 shadow-lg">
+              {statusOptions.map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={(event) => {
+                    onStatusChange(value);
+                    event.currentTarget.closest("details")?.removeAttribute("open");
+                  }}
+                  className={`block w-full rounded-md px-2.5 py-2 text-left text-xs hover:bg-slate-100 ${status === value ? "font-semibold text-indigo-700" : ""
+                    }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </details>
+        </li>
+        <li className="flex items-center gap-3">
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-white/15 text-xs font-bold text-blue-100">
+            3
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs font-semibold">Arrive at destination</span>
+            <span className="block truncate text-[10px] text-blue-100/70">{journey.dest}</span>
+          </span>
+          <ChevronRight size={16} className="text-blue-100/70" aria-hidden="true" />
+        </li>
+      </ol>
+
+      <div className="mt-auto rounded-xl border border-blue-300/30 bg-white/0.06 p-3">
+        <div className="flex items-center gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-blue-500/40">
+            <Clock3 size={20} aria-hidden="true" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[10px] font-semibold">Next check-in</span>
+            <span className="block text-sm font-bold">Today, {formatTime(journey.time)}</span>
+          </span>
+          <span className="text-[9px] text-blue-100/75">{timeUntil(journey.time)}</span>
+          <ChevronRight size={15} className="text-blue-100/75" aria-hidden="true" />
         </div>
       </div>
 
       {status === "assist" && (
-        <div className="rounded-2xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/40 p-5">
-          <div className="flex items-center gap-2 mb-2"><Badge>SIMULATED</Badge><span className="font-semibold text-rose-900 dark:text-rose-200">Assistance request sent</span></div>
-          <div className="rounded-xl bg-white dark:bg-slate-900 border border-rose-100 dark:border-rose-900 p-4 text-sm">
-            <p className="text-xs text-slate-500 mb-1">What {j.cname} would see:</p>
-            <p>Your contact needs assistance. Destination: <b>{j.dest}</b>. Expected arrival: <b>{j.time}</b>. Please try to reach them.</p>
-          </div>
-          <p className="text-xs text-rose-900/80 dark:text-rose-200/80 mt-3">This is a demo. SafeSignal does not contact police or emergency services. In real danger, call your local emergency number.</p>
-        </div>
+        <p role="status" className="mt-3 rounded-lg bg-rose-500/20 px-3 py-2 text-xs text-rose-100">
+          This is a simulated assistance request; no message has been sent.
+        </p>
       )}
-
-      <div className={card}>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold">Safety checklist</h3>
-          <Badge>
-            {source === "ai" ? "AI-generated" : source === "loading" ? "Loading AI tips..." : "Sample checklist"}
-          </Badge>
-        </div>
-        <ul className="space-y-2">
-          {items.map((t, i) => (
-            <li key={i}>
-              <label className="flex items-start gap-3 text-sm cursor-pointer">
-                <input type="checkbox" className="mt-0.5 h-4 w-4 accent-teal-600" checked={!!done[i]} onChange={() => setDone({ ...done, [i]: !done[i] })} />
-                <span className={done[i] ? "line-through text-slate-400" : ""}>{t}</span>
-              </label>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div className={card}>
-        <h3 className="font-semibold mb-3">Activity</h3>
-        <ul className="space-y-2 text-sm">
-          {log.map((l, i) => <li key={i} className="flex justify-between text-slate-600 dark:text-slate-400"><span>{l[0]}</span><span>{l[1]}</span></li>)}
-        </ul>
-      </div>
+      <span className="sr-only">Current status: {currentStatus.t}</span>
     </div>
   );
 }
